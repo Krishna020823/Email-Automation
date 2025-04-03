@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Sender</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+</head>
+<body>
+    <header>
+        <img src="https://www.coforge.com/hubfs/website-assets/coforge-logo.svg" class="logo" alt="Coforge" title="Coforge">
+        <div class="header-text">
+            <h2>ENGAGE WITH THE EMERGING</h2>
+            <h1>Email Sender</h1>
+        </div>
+    </header>
+    <main>
+        <form id="email-form" method="post" enctype="multipart/form-data">
+            <label for="file">Upload Excel File:</label>
+            <input type="file" name="file" id="file" required>
+
+            <label for="rich_text_content">Message:</label>
+            <div id="editor-container" style="height: 200px;"></div>
+            <input type="hidden" name="rich_text_content" id="rich_text_content">
+
+            <label for="attachments">Attachments (optional):</label>
+            <input type="file" name="attachments" id="attachments" multiple>
+
+            <label for="signature_text">Signature:</label>
+            <textarea name="signature_text" id="signature_text" rows="3" placeholder="Enter your signature" required></textarea>
+
+            <button type="submit">Send Emails</button>
+        </form>
+
+        <div id="processing-status" style="display: none; margin-top: 20px;">
+            <p>Processing... Please wait while emails are being sent.</p>
+        </div>
+
+        <div id="total-emails-sent" style="display: none; margin-top: 20px;">
+            <p>Total emails sent: <span id="emails-sent-count">0</span></p>
+        </div>
+
+        <h2>Emails Sent To:</h2>
+        <ul id="sent-emails-list"></ul>
+    </main>
+    <script>
+        let emailsSentCount = 0;
+
+        var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            modules: {
+                toolbar: false
+            }
+        });
+
+        document.getElementById('email-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            document.getElementById('rich_text_content').value = quill.root.innerHTML;
+            const formData = new FormData(event.target);
+
+            document.getElementById('processing-status').style.display = 'block';
+            document.getElementById('total-emails-sent').style.display = 'none';
+            document.getElementById('emails-sent-count').textContent = '0';
+            document.getElementById('sent-emails-list').innerHTML = '';
+
+            fetch('/start_sending_emails', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  emailsSentCount = 0;
+                  checkEmailStatus(data.total_emails);
+              });
+        });
+
+        function checkEmailStatus(totalEmails) {
+            fetch('/get_sent_emails')
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('sent-emails-list');
+                    list.innerHTML = '';
+                    data.forEach(email => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = email;
+                        list.appendChild(listItem);
+                    });
+                    emailsSentCount = data.length;
+                    document.getElementById('emails-sent-count').textContent = emailsSentCount;
+
+                    if (emailsSentCount < totalEmails) {
+                        setTimeout(() => checkEmailStatus(totalEmails), 2000);
+                    } else {
+                        document.getElementById('processing-status').style.display = 'none';
+                        document.getElementById('total-emails-sent').style.display = 'block';
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
